@@ -1,0 +1,54 @@
+---
+
+- name: "Register git current tag"
+  local_action: command git describe
+  become: false
+  run_once: true
+  register: version
+  ignore_errors: True
+  when: sentry_organization_slug and sentry_token
+
+- name: "Register git commit hash when no tag is found"
+  local_action: command git rev-parse HEAD
+  become: false
+  run_once: true
+  register: version
+  when: version|failed and sentry_organization_slug and sentry_token
+
+- name: "Register git current commit hash"
+  local_action: command git rev-parse HEAD
+  become: false
+  run_once: true
+  register: commit
+  when: sentry_organization_slug and sentry_token
+
+- name: "Notify Sentry of new release"
+  uri:
+    url: "https://sentry.io/api/0/organizations/{{ sentry_organization_slug }}/releases/"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ sentry_token }}"
+      Content-Type: "application/json"
+    body:
+      version: "{{ version.stdout }}"
+      ref: "{{ commit.stdout }}"
+      projects:
+        - "{{ sentry_project_name }}"
+    body_format: "json"
+    status_code: 201, 208
+  run_once: true
+  when: sentry_organization_slug and sentry_token and sentry_project_name
+
+- name: "Notify Sentry of new deployment"
+  uri:
+    url: "https://sentry.io/api/0/organizations/{{ sentry_organization_slug }}/releases/{{ version.stdout }}/deploys/"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ sentry_token }}"
+      Content-Type: "application/json"
+    body:
+      environment: "{{ sentry_environment }}"
+    body_format: "json"
+    status_code: 201
+  run_once: true
+  when: sentry_organization_slug and sentry_token and sentry_environment

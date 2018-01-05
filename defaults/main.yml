@@ -1,0 +1,5 @@
+---
+
+sentry_organization_slug: "organization"
+sentry_token: "token"
+sentry_environment: "production"
